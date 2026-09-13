@@ -14,7 +14,7 @@ If you have a paid [Nous Portal](https://portal.nousresearch.com) subscription, 
 
 ## Text-to-Speech
 
-Convert text to speech with eleven providers:
+Convert text to speech with twelve providers:
 
 | Provider | Quality | Cost | API Key |
 |----------|---------|------|---------|
@@ -29,6 +29,7 @@ Convert text to speech with eleven providers:
 | **NeuTTS** | Good | Free (local) | None needed |
 | **KittenTTS** | Good | Free (local) | None needed |
 | **Piper** | Good | Free (local) | None needed |
+| **FAL.ai** | Excellent | Paid | `FAL_KEY` |
 
 ### Platform Delivery
 
@@ -44,7 +45,7 @@ Convert text to speech with eleven providers:
 ```yaml
 # In ~/.hermes/config.yaml
 tts:
-  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "deepinfra" | "neutts" | "kittentts" | "piper" — or "nous" for the managed Tool Gateway (written when you pick Nous Subscription in `hermes tools`)
+  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "deepinfra" | "fal" | "neutts" | "kittentts" | "piper" — or "nous" for the managed Tool Gateway (written when you pick Nous Subscription in `hermes tools`)
   speed: 1.0                    # Global speed multiplier (provider-specific settings override this)
   edge:
     voice: "en-US-AriaNeural"   # 322 voices, 74 languages
@@ -103,6 +104,17 @@ tts:
     # noise_w_scale: 0.8
     # volume: 1.0                               # 0.5 = half as loud
     # normalize_audio: true
+  fal:
+    model: fal-ai/minimax/speech-02-hd          # any FAL speech endpoint id
+    voice: English_expressive_narrator          # voice id for the chosen endpoint
+    # prompt: ''                                # prose voice description, for endpoints steered that way (maya)
+    # speed: 1.0                                # overrides the global tts.speed
+    # streaming_model: fal-ai/maya              # opt into chunked playback (see caveat below)
+    # extra_args: {}                            # passed to the endpoint verbatim; wins over everything
+    # models:                                   # teach Hermes an endpoint the catalog doesn't know
+    #   fal-ai/some-new-tts:
+    #     text_field: input
+    #     voice_field: speaker.id
 ```
 
 MiniMax TTS selects its region, endpoint, and credential together:
@@ -160,6 +172,7 @@ Each provider has a documented per-request input-character cap. Hermes splits lo
 | Mistral | 4000 |
 | Google Gemini | 32000 |
 | ElevenLabs | Model-aware (see below) |
+| FAL.ai | Endpoint-aware (5000 for the MiniMax default, 32000 for Gemini) |
 | NeuTTS | 2000 |
 | KittenTTS | 2000 |
 | Piper | 5000 |
@@ -255,6 +268,41 @@ tts:
 ```
 
 **Advanced knobs** (`tts.piper.length_scale` / `noise_scale` / `noise_w_scale` / `volume` / `normalize_audio`, `use_cuda`) correspond 1:1 to Piper's `SynthesisConfig`. They're ignored on older `piper-tts` versions.
+
+### FAL.ai (one key, many endpoints)
+
+`FAL_KEY` is the same key Hermes uses for image and video generation, so enabling `tts.provider: fal` and `stt.provider: fal` gives you speech out and speech in without adding another vendor.
+
+FAL fronts many speech models whose request schemas genuinely differ — `fal-ai/kokoro` reads the text from `prompt`, `fal-ai/elevenlabs/tts/*` from `text`, and `fal-ai/minimax/*` nests the voice under `voice_setting.voice_id`. Hermes keeps a catalog of that per-endpoint shape, so `tts.fal.model` is all you normally set:
+
+| Endpoint | Notes |
+|----------|-------|
+| `fal-ai/minimax/speech-02-hd` | Default. Expressive; supports speed, pitch, volume and emotion |
+| `fal-ai/minimax/speech-02-turbo` | Faster, lower cost |
+| `fal-ai/kokoro` | 50+ built-in voices across 8 languages; cheap and quick |
+| `fal-ai/elevenlabs/tts/multilingual-v2` | Most natural; 32 languages |
+| `fal-ai/elevenlabs/tts/turbo-v2.5` | Lower-latency ElevenLabs |
+| `fal-ai/gemini-tts` | Prompt-controllable, 32k-character input |
+| `fal-ai/xai/tts/v1` | Grok voices |
+| `fal-ai/maya` | Steered by a prose `prompt`, not a voice id; the only streaming-capable entry |
+
+**Reaching an endpoint the catalog doesn't know** takes no code change — declare its field names under `tts.fal.models`:
+
+```yaml
+tts:
+  provider: fal
+  fal:
+    model: fal-ai/some-new-tts
+    models:
+      fal-ai/some-new-tts:
+        text_field: input          # where the text goes
+        voice_field: speaker.id    # dotted paths write nested payloads
+        output_ext: wav
+```
+
+The same block overrides one curated field on a known endpoint, and `tts.fal.extra_args` is merged into every request last, so it always wins.
+
+**Streaming** is opt-in and comes with a visible trade-off. Only `fal-ai/maya` exposes a chunked-PCM path, so setting `tts.fal.streaming_model: fal-ai/maya` means spoken replies start after the first sentence — but in maya's voice, not the `tts.fal.model` you configured. Left unset (the default), FAL uses the per-sentence sync path and keeps your chosen voice; Hermes never swaps a provider or voice silently just to gain streaming. Expect a slow first call on a cold endpoint (tens of seconds) before it warms up.
 
 ### Warm-up and unload via speech toggles (local engines)
 
@@ -464,6 +512,11 @@ Voice messages sent on Telegram, Discord, WhatsApp, Slack, or Signal are automat
 | **Local Whisper** (default) | Good | Free | None needed |
 | **Groq Whisper API** | Good–Best | Free tier | `GROQ_API_KEY` |
 | **OpenAI Whisper API** | Good–Best | Paid | `VOICE_TOOLS_OPENAI_KEY` or `OPENAI_API_KEY` |
+| **Mistral (Voxtral)** | Good–Best | Paid | `MISTRAL_API_KEY` |
+| **xAI (grok-stt)** | Good–Best | Paid | xAI OAuth or `XAI_API_KEY` |
+| **ElevenLabs Scribe** | Best | Paid | `ELEVENLABS_API_KEY` |
+| **DeepInfra** | Good–Best | Paid | `DEEPINFRA_API_KEY` |
+| **FAL.ai** | Good–Best | Paid | `FAL_KEY` |
 
 :::info Zero Config
 Local transcription works out of the box when `faster-whisper` is installed. If that's unavailable, Hermes can also use a local `whisper` CLI from common install locations (like `/opt/homebrew/bin`) or a custom command via `HERMES_LOCAL_STT_COMMAND`.
@@ -474,7 +527,7 @@ Local transcription works out of the box when `faster-whisper` is installed. If 
 ```yaml
 # In ~/.hermes/config.yaml
 stt:
-  provider: "local"           # "local" | "groq" | "openai" | "mistral" | "xai" | "elevenlabs" | "deepinfra"
+  provider: "local"           # "local" | "groq" | "openai" | "mistral" | "xai" | "elevenlabs" | "deepinfra" | "fal"
   language: "en"              # Global language hint applied to every provider unless a per-provider language overrides it; set "" to restore auto-detect
   local:
     model: "base"             # tiny, base, small, medium, large-v3
@@ -505,6 +558,8 @@ stt:
 **Groq API** — Requires `GROQ_API_KEY`. Good cloud fallback when you want a free hosted STT option. Set `stt.groq.language` (or the global `HERMES_LOCAL_STT_LANGUAGE` env var) to skip Whisper's auto-detect and reduce latency on known-language audio.
 
 **OpenAI API** — Accepts `VOICE_TOOLS_OPENAI_KEY` first and falls back to `OPENAI_API_KEY`. Supports `whisper-1`, `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-transcribe`.
+
+**FAL.ai** — Requires `FAL_KEY`, the same key that powers image and video generation. Defaults to `fal-ai/wizper` (Whisper v3 large accuracy at roughly twice the speed); `fal-ai/whisper` adds speaker diarization and accepts a vocabulary prompt, and `fal-ai/elevenlabs/speech-to-text` and `fal-ai/speech-to-text` are also curated. Audio is uploaded to FAL storage and passed by URL. Pin an endpoint with `stt.fal.model`.
 
 **Mistral API (Voxtral Transcribe)** — Requires `MISTRAL_API_KEY`. Uses Mistral's [Voxtral Transcribe](https://docs.mistral.ai/capabilities/audio/speech_to_text/) models. Supports 13 languages, speaker diarization, and word-level timestamps. Install with `cd ~/.hermes/hermes-agent && uv pip install -e ".[mistral]"`.
 

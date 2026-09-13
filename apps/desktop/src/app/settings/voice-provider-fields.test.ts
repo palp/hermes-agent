@@ -26,7 +26,8 @@ describe('voiceProviderKeys', () => {
       'kittentts',
       'piper',
       'deepinfra',
-      'minimax'
+      'minimax',
+      'fal'
     ]) {
       expect(voiceProviderKeys('tts', provider).length, provider).toBeGreaterThan(0)
     }

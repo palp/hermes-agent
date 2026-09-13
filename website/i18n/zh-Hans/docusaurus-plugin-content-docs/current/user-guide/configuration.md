@@ -1161,7 +1161,7 @@ agent:
 
 ```yaml
 tts:
-  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "neutts"
+  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "fal" | "neutts"
   speed: 1.0                    # 全局速度倍数（所有 provider 的回退）
   edge:
     voice: "en-US-AriaNeural"   # 322 种声音，74 种语言
@@ -1328,7 +1328,7 @@ privacy:
 
 ```yaml
 stt:
-  provider: "local"            # "local" | "groq" | "openai" | "mistral"
+  provider: "local"            # "local" | "groq" | "openai" | "mistral" | "fal"
   local:
     model: "base"              # tiny、base、small、medium、large-v3
   openai:

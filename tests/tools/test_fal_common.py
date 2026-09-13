@@ -38,7 +38,7 @@ class TestImportFalClient:
 
         result = import_fal_client()
         assert result is fake_fal_client
-        ensure.assert_called_once_with("image.fal", prompt=False)
+        ensure.assert_called_once_with("fal", prompt=False)
 
     def test_lazy_ensure_import_error_is_swallowed(self, monkeypatch, fake_fal_client):
         """If lazy_deps.ensure raises ImportError, it's swallowed (fal_client still imported)."""

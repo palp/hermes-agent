@@ -64,6 +64,7 @@ model:
   #   "arcee"        - Arcee AI Trinity models (requires: ARCEEAI_API_KEY)
   #   "ollama-cloud" - Ollama Cloud (requires: OLLAMA_API_KEY — https://ollama.com/settings)
   #   "deepinfra"    - DeepInfra (requires: DEEPINFRA_API_KEY)
+  #   "fal"          - FAL.ai (requires: FAL_KEY)
   #   "kilocode"     - KiloCode gateway (requires: KILOCODE_API_KEY)
   #   "ai-gateway"   - Vercel AI Gateway (requires: AI_GATEWAY_API_KEY)
   #   "azure-foundry" - Microsoft Foundry / Azure OpenAI (API key or Entra ID)
@@ -1501,7 +1502,7 @@ platform_toolsets:
 stt:
   enabled: true
   # provider: "local"          # auto-detected if omitted
-  # --- Cloud pre-upload silence trim (groq/openai/mistral/xai/elevenlabs/deepinfra) ---
+  # --- Cloud pre-upload silence trim (groq/openai/mistral/xai/elevenlabs/deepinfra/fal) ---
   # Local whisper gets Silero VAD; cloud endpoints otherwise receive raw audio —
   # silence inflates upload time, per-audio-minute billing, and hallucination risk.
   # Collapses pauses with ffmpeg client-side; clips under 12s skip the trim, and
@@ -1558,7 +1559,7 @@ stt:
   #   # live result. Pin only when you need a specific Whisper variant.
   #   model: ""
 
-# Text-to-speech. Only the deepinfra block is documented here — the
+# Text-to-speech. Only the deepinfra and fal blocks are documented here — the
 # remaining providers (edge, openai, xai, minimax, mistral, gemini,
 # elevenlabs, neutts, kittentts, piper) inherit sensible defaults from
 # DEFAULT_CONFIG in hermes_cli/config.py.
@@ -1570,6 +1571,21 @@ stt:
 #     # live result.
 #     model: ""
 #     voice: "default"
+#   fal:
+#     # Any FAL speech endpoint id. The curated ones (whose payload shape
+#     # Hermes knows) are listed in tools/voice_fal_catalog.py.
+#     model: "fal-ai/minimax/speech-02-hd"
+#     voice: "English_expressive_narrator"
+#     # Opt into chunked playback. Only fal-ai/maya streams, and it speaks in
+#     # its own voice rather than the `model` above — so this is a deliberate
+#     # trade-off, never applied automatically.
+#     # streaming_model: "fal-ai/maya"
+#     # prompt: ""          # prose voice description, for maya-style endpoints
+#     # extra_args: {}      # merged into every request last; always wins
+#     # models:             # teach Hermes an endpoint the catalog lacks
+#     #   fal-ai/some-new-tts:
+#     #     text_field: "input"
+#     #     voice_field: "speaker.id"
 
 # "Hey Hermes" hands-free wake word (off by default; toggle with /wake).
 # Full engine/provider options inherit from DEFAULT_CONFIG in

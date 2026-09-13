@@ -58,6 +58,7 @@ from tools.tts_tool_plugins import (
     _dispatch_to_plugin_provider, _plugin_provider_is_available,
     _plugin_provider_is_voice_compatible)
 from tools.tts_tool_openai import _generate_deepinfra_tts, _generate_openai_tts, _has_openai_audio_backend
+from tools.tts_tool_fal import _fal_tts_available, _generate_fal_tts
 
 
 # --- Lazy SDK importers -- providers import only when used (headless boxes lack PortAudio etc.) ---
@@ -159,7 +160,7 @@ def _get_provider(tts_config: Dict[str, Any]) -> str:
 OPUS_VOICE_PLATFORMS = frozenset({"telegram", "matrix", "feishu", "whatsapp", "signal"})
 # Built-ins that emit Opus natively when asked for .ogg; the rest need ffmpeg for voice bubbles.
 _NATIVE_OPUS_PROVIDERS = frozenset({"openai", "elevenlabs", "mistral", "gemini"})
-_FFMPEG_OPUS_PROVIDERS = frozenset({"edge", "neutts", "minimax", "xai", "kittentts", "piper"})
+_FFMPEG_OPUS_PROVIDERS = frozenset({"edge", "neutts", "minimax", "xai", "kittentts", "piper", "fal"})
 
 
 # --- Built-in provider dispatch ---
@@ -188,7 +189,8 @@ _BUILTIN_DISPATCH: Dict[str, tuple] = {
     "piper": (lambda: _importable(_import_piper), "Piper (local)", "_generate_piper_tts",
               "Piper provider selected but 'piper-tts' package not installed. "
               "Run 'hermes tools' and select Piper under TTS, or install manually: "
-              "pip install piper-tts")}
+              "pip install piper-tts"),
+    "fal": (None, "FAL.ai TTS", "_generate_fal_tts", None)}
 
 
 def _error_json(message: str) -> str:
@@ -506,7 +508,8 @@ _BUILTIN_REQUIREMENTS: Dict[str, Callable[[], bool]] = {
     "mistral": lambda: _importable(_import_mistral_client) and bool(_resolve_provider_key("MISTRAL_API_KEY", "mistral")),
     "neutts": lambda: _check_neutts_available(),
     "kittentts": lambda: _check_kittentts_available(),
-    "piper": lambda: _check_piper_available()}
+    "piper": lambda: _check_piper_available(),
+    "fal": lambda: _fal_tts_available()}
 
 
 def check_tts_requirements() -> bool:
@@ -530,7 +533,7 @@ TTS_SCHEMA = {
         "properties": {
             "text": {
                 "type": "string",
-                "description": "The text to convert to speech. Provider-specific per-request character caps apply automatically (OpenAI 4096, xAI 15000, MiniMax 10000, ElevenLabs 5k-40k depending on model); longer input is split into ordered chunks without silent truncation."
+                "description": "The text to convert to speech. Provider-specific per-request character caps apply automatically (OpenAI 4096, xAI 15000, MiniMax 10000, FAL 5000, ElevenLabs 5k-40k depending on model); longer input is split into ordered chunks without silent truncation."
             },
             "output_path": {
                 "type": "string",
@@ -554,7 +557,7 @@ TTS_SCHEMA = {
                 "description": (
                     "Optional TTS provider override. Accepts built-in names "
                     "(edge, openai, elevenlabs, minimax, xai, mistral, gemini, "
-                    "neutts, kittentts, piper), user-declared command provider "
+                    "neutts, kittentts, piper, deepinfra, fal), user-declared command provider "
                     "names from tts.providers.<name>, or plugin-registered names. "
                     "When omitted, the configured tts.provider from config.yaml is used."
                 )

@@ -971,3 +971,105 @@ def test_sync_pipeline_cleans_temp_files(monkeypatch):
     assert created, "expected temp files to be created via mkstemp"
     leftovers = [p for p in created if os.path.exists(p)]
     assert not leftovers, f"temp files not cleaned: {leftovers}"
+
+
+# ── FAL streamer ─────────────────────────────────────────────────────────
+# FAL's stream path returns a plain chunked ``audio/pcm`` body rather than an SSE/JSON envelope
+# (verified against fal-ai/maya/stream: Content-Type audio/pcm, int16 LE mono at 24 kHz, arriving
+# incrementally), so the bytes need no decoding — these tests pin that passthrough plus the opt-in
+# gate that keeps a non-streaming configuration on the sync path.
+
+
+def _fal_cfg(**fal):
+    return {"provider": "fal", "fal": fal}
+
+
+def test_fal_resolves_no_streamer_without_a_stream_capable_endpoint(monkeypatch):
+    # The default TTS endpoint (minimax/speech-02-hd) has no chunked API, so the dispatcher must
+    # fall back to per-sentence sync synthesis and KEEP the configured voice. The gate is in
+    # __init__ (available() cannot see the config), and _try_instantiate turns that into None.
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
+    cfg = _fal_cfg(model="fal-ai/minimax/speech-02-hd")
+    assert ts.resolve_streaming_provider(cfg) is None
+
+
+def test_fal_resolves_once_a_streaming_model_is_opted_into(monkeypatch):
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
+    cfg = _fal_cfg(streaming_model="fal-ai/maya", prompt="a calm voice")
+    prov = ts.resolve_streaming_provider(cfg)
+    assert isinstance(prov, ts.StreamingTTSProvider)
+
+
+def test_fal_unavailable_without_a_key(monkeypatch):
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "")
+    assert ts._REGISTRY["fal"].available() is False
+    assert ts.resolve_streaming_provider(_fal_cfg(streaming_model="fal-ai/maya")) is None
+
+
+def test_fal_declares_the_pcm_format_the_abc_requires(monkeypatch):
+    cfg = _fal_cfg(streaming_model="fal-ai/maya", prompt="a calm voice")
+    inst = ts._REGISTRY["fal"](cfg, cfg["fal"])
+    assert (inst.sample_rate, inst.channels, inst.sample_width) == (24000, 1, 2)
+
+
+def test_fal_stream_passes_chunked_pcm_through_unchanged(monkeypatch):
+    cfg = _fal_cfg(streaming_model="fal-ai/maya", prompt="a calm adult voice")
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
+    inst = ts._REGISTRY["fal"](cfg, cfg["fal"])
+    chunks = [b"\x01\x02" * 16, b"\x03\x04" * 16]
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def iter_content(self, chunk_size=None): yield from chunks
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def _post(url, json=None, headers=None, stream=None, timeout=None):
+        captured.update(url=url, json=json, headers=headers, stream=stream)
+        return _Resp()
+
+    with patch.dict(sys.modules, {"requests": MagicMock(post=_post)}):
+        assert list(inst.stream("Hello there.")) == chunks
+
+    assert captured["url"] == "https://fal.run/fal-ai/maya/stream"
+    assert captured["stream"] is True
+    # FAL authenticates as "Key <token>", not Bearer.
+    assert captured["headers"]["Authorization"] == "Key fal-key"
+    # The stream args must reach the payload or FAL returns mp3, not the PCM the ABC needs.
+    assert captured["json"]["output_format"] == "pcm"
+    assert captured["json"]["sample_rate"] == "24 kHz"
+    assert captured["json"]["text"] == "Hello there."
+    assert captured["json"]["prompt"] == "a calm adult voice"
+
+
+def test_fal_stream_is_byte_capped(monkeypatch):
+    cfg = _fal_cfg(streaming_model="fal-ai/maya", prompt="a calm voice")
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
+    inst = ts._REGISTRY["fal"](cfg, cfg["fal"])
+    monkeypatch.setattr(ts, "_STREAM_SENTENCE_BYTE_CAP", 100)
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def iter_content(self, chunk_size=None):
+            while True:
+                yield b"\x00" * 64
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    with patch.dict(sys.modules, {"requests": MagicMock(post=lambda *a, **kw: _Resp())}):
+        out = list(inst.stream("Runaway."))
+    assert sum(len(c) for c in out) <= 100
+
+
+def test_fal_non_streaming_endpoint_refuses_construction(monkeypatch):
+    cfg = _fal_cfg(model="fal-ai/minimax/speech-02-hd")
+    with pytest.raises(RuntimeError, match="streaming_model"):
+        ts._REGISTRY["fal"](cfg, cfg["fal"])
+
+
+def test_fal_prompt_steered_stream_needs_a_prompt(monkeypatch):
+    cfg = _fal_cfg(streaming_model="fal-ai/maya")
+    monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
+    with pytest.raises(RuntimeError, match="voice description"):
+        ts._REGISTRY["fal"](cfg, cfg["fal"])

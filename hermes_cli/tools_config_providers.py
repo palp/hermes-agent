@@ -626,7 +626,10 @@ STT_MODEL_CATALOG = {
     "local": ["base", "tiny", "small", "medium", "large-v3"],
     "groq": ["whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"],
     "openai": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"],
-    "elevenlabs": ["scribe_v2", "scribe_v1"]}
+    "elevenlabs": ["scribe_v2", "scribe_v1"],
+    # Curated FAL ASR endpoints; the full payload shapes live in tools/voice_fal_catalog.py.
+    "fal": ["fal-ai/wizper", "fal-ai/whisper", "fal-ai/elevenlabs/speech-to-text",
+            "fal-ai/speech-to-text"]}
 
 # ElevenLabs historically uses ``model_id`` instead of ``model``.
 _STT_MODEL_CONFIG_KEY = {"elevenlabs": "model_id"}

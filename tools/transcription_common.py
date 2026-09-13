@@ -19,6 +19,9 @@ DEFAULT_STT_MODEL = os.getenv("STT_OPENAI_MODEL", "whisper-1")
 DEFAULT_GROQ_STT_MODEL = os.getenv("STT_GROQ_MODEL", "whisper-large-v3-turbo")
 DEFAULT_MISTRAL_STT_MODEL = os.getenv("STT_MISTRAL_MODEL", "voxtral-mini-latest")
 DEFAULT_ELEVENLABS_STT_MODEL = os.getenv("STT_ELEVENLABS_MODEL", "scribe_v2")
+# FAL fronts several ASR endpoints; the per-endpoint payload shapes live in
+# tools/voice_fal_catalog.py. wizper matches whisper-v3-large WER at ~2x the speed.
+DEFAULT_FAL_STT_MODEL = os.getenv("STT_FAL_MODEL", "fal-ai/wizper")
 LOCAL_STT_COMMAND_ENV = "HERMES_LOCAL_STT_COMMAND"
 LOCAL_STT_LANGUAGE_ENV = "HERMES_LOCAL_STT_LANGUAGE"
 COMMON_LOCAL_BIN_DIRS = ("/opt/homebrew/bin", "/usr/local/bin")
@@ -43,7 +46,8 @@ GROQ_MODELS = {"whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-lar
 # The plugin hook from issue #30398-style follow-up rejects plugins registering under any of these names;
 # the dispatcher in ``transcribe_audio`` short-circuits them defensively as well.
 BUILTIN_STT_PROVIDERS = frozenset({
-    "local", "local_command", "groq", "openai", "mistral", "xai", "elevenlabs", "deepinfra"})
+    "local", "local_command", "groq", "openai", "mistral", "xai", "elevenlabs", "deepinfra",
+    "fal"})
 # Built-in providers that upload audio to a remote API.
 CLOUD_STT_PROVIDERS = frozenset(BUILTIN_STT_PROVIDERS - {"local", "local_command"})
 

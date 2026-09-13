@@ -995,7 +995,7 @@ DEFAULT_CONFIG = {
     # NeuTTS/KittenTTS 2000).
     "tts": {
         # "edge" (free) | "elevenlabs" (premium) | "openai" | "xai" | "minimax" | "mistral" |
-        # "gemini" | "deepinfra" | "neutts" (local) | "kittentts" (local) | "piper" (local)
+        # "gemini" | "deepinfra" | "fal" | "neutts" (local) | "kittentts" (local) | "piper" (local)
         "provider": "edge",
         "edge": {
             # Popular: AriaNeural, JennyNeural, AndrewNeural, BrianNeural, SoniaNeural
@@ -1056,6 +1056,21 @@ DEFAULT_CONFIG = {
             "voice": "default",
             # optional "base_url" key overrides DEEPINFRA_BASE_URL for TTS only
         },
+        "fal": {
+            # Any FAL speech endpoint id. Curated ones (payload shape known) are in
+            # tools/voice_fal_catalog.py: minimax/speech-02-hd and -turbo, kokoro,
+            # elevenlabs/tts/multilingual-v2 and /turbo-v2.5, gemini-tts, xai/tts/v1, maya.
+            "model": "fal-ai/minimax/speech-02-hd",
+            "voice": "English_expressive_narrator",  # voice id for the chosen endpoint
+            # Optional keys:
+            #   prompt: prose voice description, for endpoints steered that way (maya)
+            #   streaming_model: a stream-capable endpoint (e.g. fal-ai/maya) to start speaking
+            #     after the first sentence — but in THAT endpoint's voice. Unset (default) = the
+            #     sync path, which keeps the voice "model" above.
+            #   extra_args: {}  passed through to the endpoint verbatim, wins over everything
+            #   models: {<endpoint>: {text_field, voice_field, ...}}  teach Hermes an endpoint the
+            #     catalog doesn't know, or override a curated one, without a code change
+        },
     },
 
     "stt": {
@@ -1063,8 +1078,9 @@ DEFAULT_CONFIG = {
         # Echo the raw transcript of gateway voice messages back as a 🎙️ message.
         "echo_transcripts": True,
         # No seeded "provider": a stored value counts as an explicit user pick; unset = autodetect
-        # ladder. Valid: "local" (faster-whisper) | "groq" | "openai" | "mistral" | "elevenlabs" |
-        # "deepinfra". Global language hint unless a per-provider language overrides it. "en"
+        # ladder. Valid: "local" (faster-whisper) | "groq" | "openai" | "mistral" | "xai" |
+        # "elevenlabs" | "deepinfra" | "fal". Global language hint unless a per-provider language
+        # overrides it. "en"
         # because Whisper auto-detect misreads short/accented clips; "" = auto; or "es", "zh", ...
         "language": "en",
         # Client-side ffmpeg silence trim before cloud upload (local whisper uses VAD): silence
@@ -1111,6 +1127,14 @@ DEFAULT_CONFIG = {
         "deepinfra": {
             "model": "",  # empty = first stt-tagged model from the live catalog
             # optional "base_url" key overrides DEEPINFRA_BASE_URL for STT only
+        },
+        "fal": {
+            # Curated endpoints (tools/voice_fal_catalog.py): fal-ai/wizper (default; whisper-v3
+            # -large accuracy at ~2x speed), fal-ai/whisper (adds a vocabulary prompt),
+            # fal-ai/elevenlabs/speech-to-text, fal-ai/speech-to-text.
+            "model": "fal-ai/wizper",
+            "language": "",  # auto-detect; set "en", "es", ... to force
+            # Optional "extra_args" / "models" keys work as in tts.fal above.
         },
     },
 
@@ -2604,8 +2628,8 @@ OPTIONAL_ENV_VARS = {
         "Optional bearer token sent as Authorization header to a remote/authenticated Camofox "
         "server", "Camofox API key", "https://github.com/jo-inc/camofox-browser",
         tools=["browser_navigate", "browser_click"], advanced=True),
-    "FAL_KEY": _tool("FAL API key for image and video generation", "FAL API key", "https://fal.ai/",
-        tools=["image_generate", "video_generate"]),
+    "FAL_KEY": _tool("FAL API key for image, video and speech generation", "FAL API key", "https://fal.ai/",
+        tools=["image_generate", "video_generate", "text_to_speech", "voice_transcription"]),
     "KREA_API_KEY": _tool("Krea API key for Krea 2 image generation (Medium + Large)",
         "Krea API key", "https://www.krea.ai/settings/api-tokens", tools=["image_generate"]),
     "VOICE_TOOLS_OPENAI_KEY": _tool(

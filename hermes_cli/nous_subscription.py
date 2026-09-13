@@ -344,6 +344,7 @@ def _audio_features(
     tts_available = bool({
         "edge": True, "neutts": True, "openai": managed["tts"] or direct_openai_tts,
         "elevenlabs": _any_env("ELEVENLABS_API_KEY") and not tts_gw, "mistral": _any_env("MISTRAL_API_KEY"),
+        "fal": _any_env("FAL_KEY") and not tts_gw,
     }.get(tts_current, False))
     tts = _state(
         "tts", available=tts_available, active=bool(tts_tool_enabled and tts_available),
@@ -358,6 +359,7 @@ def _audio_features(
     stt_available = bool({
         "local": _local_stt_backend_available() and not stt_gw, "openai": managed["stt"] or direct_openai_stt,
         "groq": _any_env("GROQ_API_KEY") and not stt_gw, "mistral": _any_env("MISTRAL_API_KEY") and not stt_gw,
+        "fal": _any_env("FAL_KEY") and not stt_gw,
     }.get(stt_current, False))
     stt = _state(
         "stt", available=stt_available, active=stt_available, toolset_enabled=True,

@@ -39,7 +39,8 @@ def _local_tts_warmers() -> Dict[str, Callable[[Dict[str, Any]], Any]]:
 
 
 # tools.lazy_deps feature key for providers whose SDK installs on first use.
-_LAZY_SDK_FEATURES = {"edge": "tts.edge", "elevenlabs": "tts.elevenlabs", "mistral": "tts.mistral"}
+_LAZY_SDK_FEATURES = {"edge": "tts.edge", "elevenlabs": "tts.elevenlabs", "mistral": "tts.mistral",
+                      "fal": "fal"}
 
 
 def _signal_user_tts_provider(name: str, tts_config: Dict[str, Any], hook: str) -> Optional[str]:

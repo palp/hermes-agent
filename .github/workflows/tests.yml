@@ -72,7 +72,7 @@ jobs:
         #
         # The trailing extras beyond all/dev are the lazy-install features
         # (tools/lazy_deps.py) that tests exercise for real: provider.anthropic,
-        # stt/tts.mistral, image.fal, terminal.modal, terminal.daytona,
+        # stt/tts.mistral, fal, terminal.modal, terminal.daytona,
         # memory.hindsight, search.parallel. The hermetic test env forbids
         # mid-run pip installs (HERMES_DISABLE_LAZY_INSTALLS=1 in
         # tests/conftest.py), so the SDKs those tests need must be in the

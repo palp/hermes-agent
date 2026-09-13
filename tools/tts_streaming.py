@@ -338,3 +338,66 @@ class XAIStreamer(StreamingTTSProvider):
                 if exc.__class__.__name__ != "ConnectionClosed":
                     logger.warning("xAI WS receive failed: %s", exc)
                 return
+
+
+@register("fal")
+class FalStreamer(StreamingTTSProvider):
+    """FAL chunked HTTP → raw ``audio/pcm`` body (int16 LE mono).
+
+    Closest sibling of :class:`ElevenLabsStreamer`: FAL's stream path returns a plain chunked audio
+    body rather than an SSE/JSON envelope, so there is nothing to decode — the bytes are already the
+    PCM the ABC wants. Verified against ``fal-ai/maya/stream`` at ``sample_rate: "24 kHz"``.
+
+    Only endpoints whose catalog entry carries a ``stream`` block can stream, and that depends on the
+    config, which :meth:`available` (a staticmethod called before construction) cannot see. So the
+    endpoint gate lives in :meth:`__init__`: a section with no streamable endpoint raises, and
+    ``_try_instantiate`` turns that into ``None`` — the dispatcher then speaks per-sentence through
+    the sync path, keeping the configured voice instead of silently swapping it. ``tts.fal.model``
+    is usually non-streaming (the default, MiniMax speech-02-hd, has no stream path), so streaming
+    is opted into with ``tts.fal.streaming_model``.
+    """
+
+    def __init__(self, tts_config: Dict, section: Dict):
+        super().__init__(tts_config, section)
+        from tools.voice_fal_catalog import resolve_tts_model, stream_config
+
+        cfg = dict(section or {})
+        # ``streaming_model`` is the opt-in; otherwise only a ``model`` that itself streams counts.
+        if cfg.get("streaming_model"):
+            cfg["model"] = cfg["streaming_model"]
+        self._endpoint, self._entry = resolve_tts_model(cfg)
+        self._stream = stream_config(self._entry)
+        if self._stream is None:
+            raise RuntimeError(
+                f"FAL endpoint {self._endpoint!r} has no chunked-PCM stream path; "
+                "set tts.fal.streaming_model (e.g. fal-ai/maya) to stream.")
+        self._voice = cfg.get("voice") or self._entry.get("default_voice")
+        self._prompt = cfg.get("prompt") or cfg.get("voice_description")
+        if self._entry.get("prompt_field") and not self._prompt:
+            raise RuntimeError(
+                f"FAL streaming endpoint {self._stream['endpoint']!r} is steered by a prose voice "
+                "description — set tts.fal.prompt.")
+        rate = self._stream.get("sample_rate")
+        self.sample_rate = int(rate) if isinstance(rate, int) and rate > 0 else 24000
+
+    @staticmethod
+    def available() -> bool:
+        """Credentials only, per the ABC contract — the endpoint gate is in ``__init__``."""
+        return bool(_resolve_key("FAL_KEY", "fal"))
+
+    def stream(self, text: str) -> Iterator[bytes]:
+        import requests
+
+        from tools.voice_fal_catalog import build_payload
+
+        arguments = build_payload(
+            self._entry, {"text": text, "voice": self._voice, "prompt": self._prompt})
+        arguments.update(self._stream.get("args") or {})
+        with requests.post(
+            f"https://fal.run/{self._stream['endpoint']}", json=arguments,
+            headers={"Authorization": f"Key {_resolve_key('FAL_KEY', 'fal')}",
+                     "Content-Type": "application/json"},
+            stream=True, timeout=120,
+        ) as response:
+            response.raise_for_status()
+            yield from _capped(response.iter_content(chunk_size=8192), "FAL streaming TTS")

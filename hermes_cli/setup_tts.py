@@ -115,7 +115,8 @@ _TTS_PROVIDER_CHOICES = [
     ("mistral", "Mistral Voxtral TTS (multilingual, native Opus, needs API key)"),
     ("gemini", "Google Gemini TTS (30 prebuilt voices, prompt-controllable, needs API key)"),
     ("neutts", "NeuTTS (local on-device, free, ~300MB model download)"),
-    ("kittentts", "KittenTTS (local on-device, free, lightweight ~25-80MB ONNX)")]
+    ("kittentts", "KittenTTS (local on-device, free, lightweight ~25-80MB ONNX)"),
+    ("fal", "FAL.ai TTS (MiniMax/Kokoro/ElevenLabs/Gemini via one key, needs API key)")]
 # Short label = menu label minus its parenthetical ("Edge TTS", "Mistral Voxtral TTS", ...).
 _TTS_PROVIDER_LABELS = {key: label.split(" (")[0] for key, label in _TTS_PROVIDER_CHOICES}
 # provider -> (env vars that satisfy it, env var to save, prompt, success line, pre-prompt hint)
@@ -130,6 +131,9 @@ _TTS_API_KEY_PROVIDERS = {
                 "Mistral TTS API key saved", ""),
     "gemini": (("GEMINI_API_KEY", "GOOGLE_API_KEY"), "GEMINI_API_KEY", "Gemini API key for TTS",
                "Gemini TTS API key saved", "Get a free API key at https://aistudio.google.com/app/apikey"),
+    "fal": (("FAL_KEY",), "FAL_KEY", "FAL API key for TTS", "FAL TTS API key saved",
+            "The same key also powers image and video generation — "
+            "get one at https://fal.ai/dashboard/keys"),
 }
 # provider -> (module, display name, requirement lines, install question, installer)
 _TTS_LOCAL_PROVIDERS = {

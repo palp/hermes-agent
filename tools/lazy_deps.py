@@ -101,8 +101,12 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
         "numpy==2.4.3",
     ),
 
-    # ─── Image generation backends ─────────────────────────────────────────
-    "image.fal": ("fal-client==0.13.1",),
+    # ─── FAL.ai (image gen, video gen, TTS, STT) ───────────────────────────
+    # One key, one loader: every consumer goes through
+    # ``tools.fal_common.import_fal_client()``. Capability-scoped siblings
+    # (``tts.fal``/``stt.fal``) would duplicate this pin three ways — exactly the
+    # drift ``test_every_lazy_deps_exact_pin_matches_uv_lock`` polices.
+    "fal": ("fal-client==0.13.1",),
 
     # ─── Memory providers ──────────────────────────────────────────────────
     "memory.honcho": ("honcho-ai==2.2.0",),

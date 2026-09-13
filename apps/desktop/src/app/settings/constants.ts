@@ -249,8 +249,15 @@ export const ENUM_OPTIONS: Record<string, string[]> = {
   'stt.elevenlabs.model_id': ['scribe_v2', 'scribe_v1'],
   'stt.local.model': ['tiny', 'base', 'small', 'medium', 'large-v3'],
   // Speech-to-text backends — kept in sync with the stt block in
-  // hermes_cli/config.py (local/groq/openai/mistral/elevenlabs).
-  'stt.provider': ['local', 'groq', 'openai', 'mistral', 'xai', 'elevenlabs'],
+  // hermes_cli/config.py (local/groq/openai/mistral/elevenlabs/fal).
+  'stt.provider': ['local', 'groq', 'openai', 'mistral', 'xai', 'elevenlabs', 'fal'],
+  // Curated FAL ASR endpoints (tools/voice_fal_catalog.py); free-input so any id is typeable.
+  'stt.fal.model': [
+    'fal-ai/wizper',
+    'fal-ai/whisper',
+    'fal-ai/elevenlabs/speech-to-text',
+    'fal-ai/speech-to-text'
+  ],
   // OpenAI TTS voices — the union across models (per the OpenAI TTS API
   // docs). Model-specific narrowing happens in enumOptionsFor():
   // tts-1 / tts-1-hd support 9 voices; gpt-4o-mini-tts supports all 13.
@@ -337,8 +344,22 @@ export const ENUM_OPTIONS: Record<string, string[]> = {
     'gemini',
     'neutts',
     'kittentts',
-    'piper'
+    'piper',
+    'fal'
   ],
+  // Curated FAL speech endpoints (tools/voice_fal_catalog.py); free-input so any id is typeable.
+  'tts.fal.model': [
+    'fal-ai/minimax/speech-02-hd',
+    'fal-ai/minimax/speech-02-turbo',
+    'fal-ai/kokoro',
+    'fal-ai/elevenlabs/tts/multilingual-v2',
+    'fal-ai/elevenlabs/tts/turbo-v2.5',
+    'fal-ai/gemini-tts',
+    'fal-ai/xai/tts/v1',
+    'fal-ai/maya'
+  ],
+  // Stream-capable endpoints only: FAL streaming needs a chunked-PCM path, which maya has.
+  'tts.fal.streaming_model': ['fal-ai/maya'],
   'stt.openai.model': ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'gpt-transcribe'],
   'stt.mistral.model': ['voxtral-mini-latest', 'voxtral-mini-2602'],
   'tts.openai.model': ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'],
@@ -370,7 +391,12 @@ export const FREE_INPUT_KEYS = new Set([
   'tts.kittentts.voice',
   'tts.piper.voice',
   'tts.deepinfra.model',
-  'tts.deepinfra.voice'
+  'tts.deepinfra.voice',
+  'tts.fal.model',
+  'tts.fal.voice',
+  'tts.fal.streaming_model',
+  'tts.fal.prompt',
+  'stt.fal.model'
 ])
 
 export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
@@ -461,6 +487,9 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
       languageCode: 'ElevenLabs Language',
       tagAudioEvents: 'Tag Audio Events',
       diarize: 'Speaker Diarization'
+    },
+    fal: {
+      model: 'FAL STT Endpoint'
     }
   },
   tts: {
@@ -511,6 +540,12 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     deepinfra: {
       model: 'DeepInfra TTS Model',
       voice: 'DeepInfra Voice'
+    },
+    fal: {
+      model: 'FAL TTS Endpoint',
+      voice: 'FAL Voice',
+      prompt: 'FAL Voice Description',
+      streamingModel: 'FAL Streaming Endpoint'
     }
   },
   memory: {
@@ -601,6 +636,12 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     autoTts: 'Automatically speak assistant responses.'
   },
   tts: {
+    fal: {
+      model: 'Any FAL speech endpoint id. The same FAL_KEY also powers image and video generation.',
+      prompt: 'Prose voice description, for endpoints steered that way (maya) instead of by voice ID.',
+      streamingModel:
+        'Optional. A stream-capable endpoint (maya) starts playback after the first sentence, but speaks in that endpoint\'s voice rather than the one above. Leave blank to keep your chosen voice.'
+    },
     xai: {
       voiceId: 'xAI voice ID (e.g. eve) or a custom voice ID.',
       language: 'Spoken language code (e.g. en, pt-BR) or "auto" for auto-detection.',
@@ -619,6 +660,9 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     echoTranscripts: 'Post the raw 🎙️ transcript of voice messages back to the chat.',
     elevenlabs: {
       languageCode: 'Optional ISO-639-3 language code. Blank lets ElevenLabs auto-detect.'
+    },
+    fal: {
+      model: 'Any FAL speech-to-text endpoint id. wizper matches Whisper v3 large accuracy at about twice the speed.'
     }
   },
   updates: {
@@ -734,6 +778,10 @@ export const SECTIONS: DesktopConfigSection[] = [
       'tts.piper.voice',
       'tts.deepinfra.model',
       'tts.deepinfra.voice',
+      'tts.fal.model',
+      'tts.fal.voice',
+      'tts.fal.prompt',
+      'tts.fal.streaming_model',
       'stt.local.model',
       'stt.local.language',
       'stt.openai.model',
@@ -743,6 +791,7 @@ export const SECTIONS: DesktopConfigSection[] = [
       'stt.elevenlabs.language_code',
       'stt.elevenlabs.tag_audio_events',
       'stt.elevenlabs.diarize',
+      'stt.fal.model',
       'voice.record_key',
       'voice.max_recording_seconds',
       'voice.client_direct'

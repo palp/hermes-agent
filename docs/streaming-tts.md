@@ -57,7 +57,13 @@ tts:
 | openai      | chunked HTTP (`with_streaming_response`, `pcm`) | yes | `tts.openai.api_key` → env → managed gateway |
 | gemini      | SSE (`streamGenerateContent?alt=sse`) | yes         | `GEMINI_API_KEY` / `GOOGLE_API_KEY` |
 | xai         | WebSocket (`wss://api.x.ai/v1/tts`)   | yes         | xAI OAuth or `XAI_API_KEY` |
+| fal         | chunked HTTP (`audio/pcm`, 24 kHz)    | opt-in¹     | `FAL_KEY` |
 | edge, piper, kitten, neutts, mistral, minimax, deepinfra, … | — | no (per-sentence sync fallback) | as usual |
+
+¹ Only `fal-ai/maya` exposes a chunked-PCM path, so FAL streams only when
+`tts.fal.streaming_model` names a stream-capable endpoint — and that endpoint's voice
+replaces the configured `tts.fal.model` voice, which is why it is opt-in rather than
+automatic. Unset (the default), FAL takes the per-sentence sync path.
 
 All credential lookups go through `resolve_provider_secret()`
 (config > env/.env > credential pool) — never bare env reads. Streamed bodies

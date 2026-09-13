@@ -101,10 +101,13 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "tts.provider": _select(
         "Text-to-speech provider",
         "edge", "elevenlabs", "openai", "xai", "minimax", "mistral", "gemini", "neutts", "kittentts", "piper",
+        "fal",
     ),
     # "mistral" temporarily removed — mistralai PyPI package quarantined
     # (malicious 2.4.6 release on 2026-05-12). Restore once available.
-    "stt.provider": _select("Speech-to-text provider", "local", "groq", "openai", "xai", "elevenlabs"),
+    "stt.provider": _select(
+        "Speech-to-text provider", "local", "groq", "openai", "xai", "elevenlabs", "fal"
+    ),
     "stt.local.model": _select("Local faster-whisper model size", "tiny", "base", "small", "medium", "large-v3"),
     "stt.groq.model": _select(
         "Groq Whisper model", "whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"
@@ -113,6 +116,16 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "OpenAI transcription model", "whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"
     ),
     "stt.elevenlabs.model_id": _select("ElevenLabs Scribe model", "scribe_v2", "scribe_v1"),
+    "stt.fal.model": _select(
+        "FAL speech-to-text endpoint", "fal-ai/wizper", "fal-ai/whisper",
+        "fal-ai/elevenlabs/speech-to-text", "fal-ai/speech-to-text"
+    ),
+    "tts.fal.model": _select(
+        "FAL text-to-speech endpoint", "fal-ai/minimax/speech-02-hd",
+        "fal-ai/minimax/speech-02-turbo", "fal-ai/kokoro",
+        "fal-ai/elevenlabs/tts/multilingual-v2", "fal-ai/elevenlabs/tts/turbo-v2.5",
+        "fal-ai/gemini-tts", "fal-ai/xai/tts/v1", "fal-ai/maya"
+    ),
     "display.skin": _select("CLI visual theme", "default", "ares", "mono", "slate"),
     "dashboard.theme": _select(
         "Web dashboard visual theme", "default", "midnight", "ember", "mono", "cyberpunk", "rose"

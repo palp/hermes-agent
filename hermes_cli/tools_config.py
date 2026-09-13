@@ -219,6 +219,7 @@ _NOUS = {"requires_nous_auth": True}
 _OPENAI_VOICE_KEY = _key("VOICE_TOOLS_OPENAI_KEY", "OpenAI API key", "https://platform.openai.com/api-keys")
 _ELEVENLABS_KEY = _key("ELEVENLABS_API_KEY", "ElevenLabs API key", "https://elevenlabs.io/app/settings/api-keys")
 _DEEPINFRA_KEY = _key("DEEPINFRA_API_KEY", "DeepInfra API key", "https://deepinfra.com/dash/api_keys")
+_FAL_KEY = _key("FAL_KEY", "FAL API key", "https://fal.ai/dashboard/keys")
 _LANGFUSE_PUBLIC = ("HERMES_LANGFUSE_PUBLIC_KEY", "Langfuse public key (pk-lf-...)")
 _LANGFUSE_SECRET = ("HERMES_LANGFUSE_SECRET_KEY", "Langfuse secret key (sk-lf-...)")
 
@@ -243,6 +244,8 @@ TOOL_CATEGORIES = {
                  post_setup="piper"),
             _row("DeepInfra TTS", "paid", "Chatterbox, Qwen3-TTS, … — live catalog from api.deepinfra.com", [_DEEPINFRA_KEY],
                  tts_provider="deepinfra"),
+            _row("FAL.ai TTS", "paid", "MiniMax, Kokoro, ElevenLabs, Gemini … — one key, also image/video",
+                 [_FAL_KEY], tts_provider="fal"),
         ],
     },
     "stt": {
@@ -262,6 +265,7 @@ TOOL_CATEGORIES = {
             # Mistral Voxtral STT intentionally omitted — mistralai PyPI package quarantined (malicious 2.4.6
             # release, 2026-05-12). Restore alongside the dashboard stt.provider option.
             _row("DeepInfra", "paid", "Live STT catalog from api.deepinfra.com", [_DEEPINFRA_KEY], stt_provider="deepinfra"),
+            _row("FAL.ai", "paid", "Wizper — whisper-v3-large accuracy at ~2x speed", [_FAL_KEY], stt_provider="fal"),
         ],
     },
     "web": {

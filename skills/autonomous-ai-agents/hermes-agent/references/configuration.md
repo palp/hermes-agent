@@ -13,8 +13,8 @@ Full reference: https://hermes-agent.nousresearch.com/docs/user-guide/configurat
 | `compression` | `enabled`, `threshold` (0.50), `target_ratio` (0.20) |
 | `display` | `skin`, `interface` (cli/tui), `language`, `show_reasoning`, `show_cost`, `pet` |
 | `approvals` | `mode` (smart/manual/off), `timeout`, `cron_mode` |
-| `stt` | `enabled`, `provider` (local/groq/openai/mistral/elevenlabs/deepinfra) |
-| `tts` | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts/gemini/piper/kittentts/deepinfra/xai) |
+| `stt` | `enabled`, `provider` (local/groq/openai/mistral/xai/elevenlabs/deepinfra/fal) |
+| `tts` | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts/gemini/piper/kittentts/deepinfra/xai/fal) |
 | `memory` | `memory_enabled`, `user_profile_enabled`, `provider`, `write_approval` |
 | `security` | `redact_secrets`, `tirith_enabled`, `website_blocklist` |
 | `delegation` | `model`, `provider`, `max_concurrent_children`, `max_iterations` (50), `max_spawn_depth` |
@@ -67,7 +67,7 @@ Voice messages from messaging platforms are auto-transcribed.
 ```yaml
 stt:
   enabled: true
-  provider: local   # local (faster-whisper, free) | groq | openai | mistral | elevenlabs | deepinfra
+  provider: local   # local (faster-whisper, free) | groq | openai | mistral | elevenlabs | deepinfra | fal
   local:
     model: base     # tiny, base, small, medium, large-v3
 ```

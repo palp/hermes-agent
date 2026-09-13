@@ -21,6 +21,7 @@ from typing import Optional, Dict, Any
 from utils import is_truthy_value
 from tools.transcription_common import (
     BUILTIN_STT_PROVIDERS, CLOUD_STT_PROVIDERS, DEFAULT_ELEVENLABS_STT_MODEL,
+    DEFAULT_FAL_STT_MODEL,
     DEFAULT_GROQ_STT_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_MISTRAL_STT_MODEL, DEFAULT_PROVIDER,
     DEFAULT_STT_MODEL, LOCAL_STT_COMMAND_ENV, LOCAL_STT_LANGUAGE_ENV, _error_result,
     _get_stt_section, _ok_result)
@@ -36,6 +37,7 @@ from tools.transcription_cloud import (  # noqa: F401  (handlers dispatched via 
     _has_xai_stt_credentials, _resolve_openai_audio_client_config, _transcribe_deepinfra,
     _transcribe_elevenlabs, _transcribe_groq, _transcribe_mistral, _transcribe_openai,
     _transcribe_xai)
+from tools.transcription_fal import _transcribe_fal  # noqa: F401  (dispatched via globals())
 from tools.transcription_command import (
     _apply_pre_transcription_hook, _dispatch_to_plugin_provider, _enforce_prompt_length_limit,
     _resolve_command_stt_provider_config, _transcribe_command_stt, _unregistered_stt_provider_error)
@@ -197,6 +199,7 @@ _has_groq_key = _has_key("GROQ_API_KEY", "groq", needs_openai=True)
 _has_mistral_key = _has_key("MISTRAL_API_KEY", "mistral", needs_mistral=True)
 _has_elevenlabs_key = _has_key("ELEVENLABS_API_KEY", "elevenlabs")
 _has_deepinfra_key = _has_key("DEEPINFRA_API_KEY", "deepinfra", needs_openai=True)
+_has_fal_key = _has_key("FAL_KEY", "fal")
 
 # Cloud providers in AUTO-DETECT priority order:
 #   name -> (explicit-selection probe, auto-detect probe, explicit warning, auto-detect log)
@@ -223,7 +226,13 @@ _CLOUD_PROVIDER_SPECS = {
                    "No local STT available, using ElevenLabs Scribe STT API"),
     "deepinfra": (_has_deepinfra_key, _has_deepinfra_key,
                   "STT provider 'deepinfra' configured but DEEPINFRA_API_KEY not set (or openai package missing)",
-                  "No local STT available, using DeepInfra Whisper API")}
+                  "No local STT available, using DeepInfra Whisper API"),
+    # FAL is LAST for the same reason DeepInfra is: FAL_KEY is commonly already set for image/video
+    # generation, and letting it auto-select would silently move existing users' STT off the
+    # provider they were using. Explicit ``provider: fal`` is unaffected.
+    "fal": (_has_fal_key, _has_fal_key,
+            "STT provider 'fal' configured but FAL_KEY not set",
+            "No local STT available, using FAL speech-to-text")}
 
 # Explicit selections whose resolution is more than a probe + warning.
 _EXPLICIT_RESOLVERS = {
@@ -447,7 +456,8 @@ _BUILTIN_MODEL_KEYS = {
     "openai": ("openai", "model", DEFAULT_STT_MODEL, False),
     "mistral": ("mistral", "model", DEFAULT_MISTRAL_STT_MODEL, False),
     "elevenlabs": ("elevenlabs", "model_id", DEFAULT_ELEVENLABS_STT_MODEL, False),
-    "deepinfra": ("deepinfra", "model", "", True)}
+    "deepinfra": ("deepinfra", "model", "", True),
+    "fal": ("fal", "model", DEFAULT_FAL_STT_MODEL, True)}
 
 
 def _builtin_model_name(provider: str, stt_config: Dict[str, Any], model: Optional[str]) -> str:

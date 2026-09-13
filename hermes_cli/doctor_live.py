@@ -26,6 +26,8 @@ _AUDIO_PROBES = {
     "openai": ("https://api.openai.com/v1/models", "OPENAI_API_KEY", "Bearer"),
     "groq": ("https://api.groq.com/openai/v1/models", "GROQ_API_KEY", "Bearer"),
     "elevenlabs": ("https://api.elevenlabs.io/v1/voices", "ELEVENLABS_API_KEY", "xi"),
+    # FAL authenticates as "Authorization: Key <FAL_KEY>", not Bearer.
+    "fal": ("https://fal.ai/api/models?page=1", "FAL_KEY", "Key"),
 }
 
 
@@ -138,7 +140,7 @@ def _probe_audio(kind: str, config: dict, timeout: float) -> ProbeResult:
     key = os.getenv(env_var, "").strip()
     if not key:
         return ProbeResult(name, "warn", f"(provider '{provider}' configured but {env_var} is not set)")
-    headers = {"xi-api-key": key} if scheme == "xi" else {"Authorization": f"Bearer {key}"}
+    headers = {"xi-api-key": key} if scheme == "xi" else {"Authorization": f"{scheme} {key}"}
     result = _classify_http(name, _http_get(url, headers=headers, timeout=timeout), env_var)
     result.detail = f"({provider}) {result.detail}"
     return result
