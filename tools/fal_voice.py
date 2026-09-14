@@ -13,6 +13,8 @@ import threading
 import uuid
 from typing import Any, Dict, Optional
 
+from tools.fal_common import wait_for_fal_result
+
 logger = logging.getLogger(__name__)
 
 fal_client: Any = None
@@ -53,36 +55,11 @@ def require_fal_key() -> str:
     return key
 
 
-def wait_for_result(handler, *, poll_seconds: float = 0.5) -> Any:
-    """Interrupt-aware ``handler.get()``: the SDK blocks 30-60s hiding Ctrl-C, so the get runs on
-    a daemon worker and the interrupt bit is polled between join slices (the remote job is left
-    running). Mirrors ``image_generation_tool._wait_fal_result``."""
-    from tools.interrupt import is_interrupted
-    result_box: list = []
-    error_box: list = []
-
-    def _get() -> None:
-        try:
-            result_box.append(handler.get())
-        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
-            error_box.append(exc)
-
-    worker = threading.Thread(target=_get, daemon=True, name="fal-voice-result-wait")
-    worker.start()
-    while worker.is_alive():
-        if is_interrupted():
-            raise FalVoiceInterrupted("Speech request interrupted by user — abandoned the in-flight FAL job.")
-        worker.join(timeout=poll_seconds)
-    if error_box:
-        raise error_box[0]
-    return result_box[0] if result_box else None
-
-
 def submit_and_wait(endpoint: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Submit ``arguments`` to ``endpoint`` on the FAL queue and return the completed result."""
     handler = load_fal_client().submit(endpoint, arguments=arguments,
                                        headers={"x-idempotency-key": str(uuid.uuid4())})
-    result = wait_for_result(handler)
+    result = wait_for_fal_result(handler, interrupt_exc=FalVoiceInterrupted, what="Speech request")
     if not isinstance(result, dict):
         raise RuntimeError(f"FAL endpoint {endpoint!r} returned no result")
     return result

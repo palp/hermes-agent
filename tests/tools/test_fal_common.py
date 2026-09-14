@@ -1,6 +1,6 @@
 """Tests for tools/fal_common.py — shared FAL.ai SDK plumbing.
 
-Covers: import_fal_client, _normalize_fal_queue_url_format,
+Covers: import_fal_client, wait_for_fal_result, _normalize_fal_queue_url_format,
 _extract_http_status, _ManagedFalSyncClient (init + submit).
 """
 
@@ -15,7 +15,9 @@ from tools.fal_common import (
     _extract_http_status,
     _normalize_fal_queue_url_format,
     import_fal_client,
+    wait_for_fal_result,
 )
+from tools.interrupt import set_interrupt
 
 
 # ---------------------------------------------------------------------------
@@ -642,3 +644,40 @@ class TestManagedFalSyncClientSubmit:
         client._add_timeout_header.assert_called_once()
         headers = client._maybe_retry_request.call_args[1]["headers"]
         assert headers["X-Custom"] == "val"
+
+
+# ---------------------------------------------------------------------------
+# wait_for_fal_result
+# ---------------------------------------------------------------------------
+# The threading/propagation behaviour is exercised end to end by
+# tests/tools/test_image_generation_interrupt.py through image gen's wrapper; these pin the part
+# that is new here — the caller supplies the exception class and the job name.
+
+
+class TestWaitForFalResult:
+    @pytest.fixture(autouse=True)
+    def _clean_interrupt(self):
+        set_interrupt(False)
+        yield
+        set_interrupt(False)
+
+    def test_returns_handler_result(self):
+        handler = MagicMock()
+        handler.get = MagicMock(return_value={"audio": {"url": "u"}})
+        assert wait_for_fal_result(handler, interrupt_exc=RuntimeError, what="x") == {"audio": {"url": "u"}}
+
+    def test_raises_the_callers_exception_naming_the_job(self):
+        import threading
+        import time
+
+        class SpeechInterrupted(Exception):
+            pass
+
+        class _Slow:
+            def get(self):
+                time.sleep(30)
+
+        tid = threading.current_thread().ident
+        threading.Thread(target=lambda: (time.sleep(0.2), set_interrupt(True, tid)), daemon=True).start()
+        with pytest.raises(SpeechInterrupted, match="Speech request interrupted by user"):
+            wait_for_fal_result(_Slow(), interrupt_exc=SpeechInterrupted, what="Speech request", poll_seconds=0.05)

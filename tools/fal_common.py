@@ -1,4 +1,4 @@
-"""Shared FAL.ai SDK plumbing: lazy import, managed-gateway sync client, small helpers.
+"""Shared FAL.ai SDK plumbing: lazy import, interrupt-aware result wait, managed-gateway sync client.
 
 Stateful pieces (cache globals, ``_managed_fal_client*``, ``_submit_fal_request``)
 intentionally stay on :mod:`tools.image_generation_tool`: it is the patch target for the
@@ -8,6 +8,7 @@ here would silently defeat ``monkeypatch.setattr(image_tool, "_managed_fal_clien
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Dict, Optional, Union
 from urllib.parse import urlencode
 
@@ -26,6 +27,34 @@ def import_fal_client() -> Any:
         raise ImportError(str(exc))
     import fal_client  # type: ignore  # noqa: WPS433 — intentionally lazy
     return fal_client
+
+
+def wait_for_fal_result(handler, *, interrupt_exc: type, what: str, poll_seconds: float = 0.5) -> Any:
+    """Interrupt-aware ``handler.get()`` for a submitted FAL request.
+
+    The SDK's get blocks 30-60s and hides Ctrl-C, so it runs on a daemon worker while the interrupt
+    bit is polled between join slices. On interrupt, ``interrupt_exc`` is raised (``what`` names the
+    job, e.g. "Image generation") and the worker is abandoned — the remote job keeps running.
+    """
+    from tools.interrupt import is_interrupted
+    result_box: list = []
+    error_box: list = []
+
+    def _get() -> None:
+        try:
+            result_box.append(handler.get())
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
+            error_box.append(exc)
+
+    worker = threading.Thread(target=_get, daemon=True, name="fal-result-wait")
+    worker.start()
+    while worker.is_alive():
+        if is_interrupted():
+            raise interrupt_exc(f"{what} interrupted by user — abandoned the in-flight FAL job.")
+        worker.join(timeout=poll_seconds)
+    if error_box:
+        raise error_box[0]
+    return result_box[0] if result_box else None
 
 
 def _normalize_fal_queue_url_format(queue_run_origin: str) -> str:

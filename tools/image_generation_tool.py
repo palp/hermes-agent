@@ -32,6 +32,7 @@ from tools.debug_helpers import DebugSession
 from tools.fal_common import (
     _ManagedFalSyncClient, _extract_http_status, _managed_fal_billing_error,
     _normalize_fal_queue_url_format,
+    wait_for_fal_result,
 )
 from tools.image_generation_catalog import (
     DEFAULT_ASPECT_RATIO, DEFAULT_MODEL, FAL_MODELS, UPSCALER_CREATIVITY, UPSCALER_DEFAULT_PROMPT,
@@ -94,29 +95,9 @@ class ImageGenerationInterrupted(Exception):
 
 
 def _wait_fal_result(handler, *, poll_seconds: float = 0.5):
-    """Interrupt-aware ``handler.get()``: the SDK blocks 30-60s, hiding user interrupts.
-
-    The get runs on a daemon worker; the interrupt bit is polled between join slices and on
-    interrupt the worker is abandoned (remote job keeps running).
-    """
-    from tools.interrupt import is_interrupted
-    result_box: list = []
-    error_box: list = []
-    def _get():
-        try:
-            result_box.append(handler.get())
-        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
-            error_box.append(exc)
-    worker = threading.Thread(target=_get, daemon=True, name="fal-result-wait")
-    worker.start()
-    while worker.is_alive():
-        if is_interrupted():
-            raise ImageGenerationInterrupted(
-                "Image generation interrupted by user — abandoned the in-flight FAL job.")
-        worker.join(timeout=poll_seconds)
-    if error_box:
-        raise error_box[0]
-    return result_box[0] if result_box else None
+    """Interrupt-aware ``handler.get()``; see :func:`tools.fal_common.wait_for_fal_result`."""
+    return wait_for_fal_result(
+        handler, interrupt_exc=ImageGenerationInterrupted, what="Image generation", poll_seconds=poll_seconds)
 
 
 def _submit_fal_request(model: str, arguments: Dict[str, Any]):
