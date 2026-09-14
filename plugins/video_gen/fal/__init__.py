@@ -234,6 +234,20 @@ def _submit_fal_video_request(endpoint: str, arguments: Dict[str, Any]):
         raise
 
 
+class VideoGenerationInterrupted(Exception):
+    """Raised when the user interrupts while a FAL video job is in flight."""
+
+
+def _wait_fal_video_result(handle) -> Any:
+    """Interrupt-aware ``handle.get()``; see :func:`tools.fal_common.wait_for_fal_result`.
+
+    Video jobs are the longest FAL waits Hermes makes (minutes, not seconds), so a bare ``.get()``
+    would ignore Ctrl-C for the SDK's whole poll interval.
+    """
+    from tools.fal_common import wait_for_fal_result
+    return wait_for_fal_result(handle, interrupt_exc=VideoGenerationInterrupted, what="Video generation")
+
+
 # ByteDance SeedVR2 on FAL: $0.001/megapixel of output; a 5s 720p→1440p 2x pass is roughly $0.44.
 UPSCALER_ENDPOINT = "fal-ai/seedvr/upscale/video"
 UPSCALER_FACTOR = 2
@@ -248,7 +262,10 @@ def _upscale_video(video_url: str, source_request_id: Optional[str] = None) -> O
             if not source_request_id:
                 raise RuntimeError("Managed SeedVR upscale requires the source FAL request id")
             arguments["source_request_id"] = source_request_id
-        result = _submit_fal_video_request(UPSCALER_ENDPOINT, arguments).get()
+        result = _wait_fal_video_result(_submit_fal_video_request(UPSCALER_ENDPOINT, arguments))
+    except VideoGenerationInterrupted:
+        # A user interrupt must not degrade into a silent "use the native video" fallback.
+        raise
     except Exception as exc:  # noqa: BLE001
         logger.warning("Video upscale failed: %s", exc)
         return None
@@ -343,7 +360,10 @@ class FALVideoGenProvider(VideoGenProvider):
         try:
             handle = _submit_fal_video_request(endpoint, payload)
             source_request_id = getattr(handle, "request_id", None)
-            video, url = _video_url_from_result(handle.get())
+            video, url = _video_url_from_result(_wait_fal_video_result(handle))
+        except VideoGenerationInterrupted:
+            # Not an upstream failure — let it reach the caller instead of becoming an api_error.
+            raise
         except Exception as exc:
             logger.warning("FAL video gen failed (family=%s, endpoint=%s): %s", family_id, endpoint, exc, exc_info=True)
             return _fal_error(f"FAL video generation failed: {exc}", "api_error", prompt, model=family_id, aspect_ratio=aspect_ratio)

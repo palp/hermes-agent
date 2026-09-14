@@ -627,3 +627,111 @@ class TestUpscalePass:
 
         assert fal_plugin._upscale_video("https://fake/native.mp4") is None
         submit.assert_not_called()
+
+
+class TestInterruptHandling:
+    """A Ctrl-C during a FAL video job must surface within a poll interval, not after the SDK's
+    30-60s ``get()``, and must not degrade into an error envelope or the upscale None fallback.
+    Mirrors ``tests/tools/test_image_generation_interrupt.py`` for the image path."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_interrupt(self):
+        from tools.interrupt import set_interrupt
+
+        set_interrupt(False)
+        yield
+        set_interrupt(False)
+
+    @pytest.fixture
+    def slow_fal(self, monkeypatch):
+        """Stub ``fal_client.submit`` with a handle whose get() blocks like the real SDK."""
+        import sys
+        import time
+        import types
+
+        class SlowHandle:
+            request_id = "req-1"
+
+            def get(self):
+                time.sleep(30.0)
+                return {"video": {"url": "https://fake/never.mp4"}}
+
+        fake = types.ModuleType("fal_client")
+        fake.submit = lambda endpoint, arguments=None, headers=None: SlowHandle()  # type: ignore
+        monkeypatch.setitem(sys.modules, "fal_client", fake)
+
+        from plugins.video_gen import fal as fal_plugin
+        fal_plugin._fal_client = None
+        fal_plugin._managed_fal_video_client = None
+        fal_plugin._managed_fal_video_client_config = None
+        monkeypatch.setenv("FAL_KEY", "test")
+        monkeypatch.setattr(fal_plugin, "_resolve_managed_fal_video_gateway", lambda: None)
+        return fal_plugin
+
+    @staticmethod
+    def _interrupt_caller_soon():
+        """Interrupt the *calling* thread shortly — the waiter polls on the caller, not the worker."""
+        import threading
+        import time
+
+        from tools.interrupt import set_interrupt
+
+        tid = threading.current_thread().ident
+        threading.Thread(
+            target=lambda: (time.sleep(0.2), set_interrupt(True, tid)), daemon=True).start()
+
+    def test_generate_raises_instead_of_returning_an_api_error(self, slow_fal):
+        import time
+
+        self._interrupt_caller_soon()
+        t0 = time.monotonic()
+        with pytest.raises(slow_fal.VideoGenerationInterrupted, match="Video generation interrupted by user"):
+            slow_fal.FALVideoGenProvider().generate("a dog", model="pixverse-v6")
+        assert time.monotonic() - t0 < 5.0  # not the SDK's 30s block
+
+    def test_upscale_interrupt_propagates(self, slow_fal):
+        """The upscale is best-effort and swallows failures into None; an interrupt is not a failure."""
+        import time
+
+        self._interrupt_caller_soon()
+        t0 = time.monotonic()
+        with pytest.raises(slow_fal.VideoGenerationInterrupted):
+            slow_fal._upscale_video("https://fake/native.mp4", "req-1")
+        assert time.monotonic() - t0 < 5.0
+
+    def test_upscale_still_swallows_ordinary_failures(self, monkeypatch):
+        """The re-raise must be narrow: a real upscale error still falls back to the native video."""
+        from plugins.video_gen import fal as fal_plugin
+
+        def _boom(*_a, **_k):
+            raise RuntimeError("upscaler exploded")
+
+        monkeypatch.setattr(fal_plugin, "_resolve_managed_fal_video_gateway", lambda: None)
+        monkeypatch.setattr(fal_plugin, "_submit_fal_video_request", _boom)
+        assert fal_plugin._upscale_video("https://fake/native.mp4") is None
+
+    def test_uninterrupted_generate_still_returns_the_video(self, monkeypatch):
+        """The waiter is on the happy path too, so pin that it passes the result through."""
+        import sys
+        import types
+
+        class FastHandle:
+            request_id = "req-1"
+
+            def get(self):
+                return {"video": {"url": "https://fake/native.mp4"}}
+
+        fake = types.ModuleType("fal_client")
+        fake.submit = lambda endpoint, arguments=None, headers=None: FastHandle()  # type: ignore
+        monkeypatch.setitem(sys.modules, "fal_client", fake)
+
+        from plugins.video_gen import fal as fal_plugin
+        fal_plugin._fal_client = None
+        fal_plugin._managed_fal_video_client = None
+        fal_plugin._managed_fal_video_client_config = None
+        monkeypatch.setenv("FAL_KEY", "test")
+        monkeypatch.setattr(fal_plugin, "_resolve_managed_fal_video_gateway", lambda: None)
+
+        result = fal_plugin.FALVideoGenProvider().generate("a dog", model="pixverse-v6")
+        assert result["success"] is True
+        assert result["video"] == "https://fake/native.mp4"
