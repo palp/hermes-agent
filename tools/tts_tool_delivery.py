@@ -55,9 +55,7 @@ PROVIDER_MAX_TEXT_LENGTH: Dict[str, int] = {
     "neutts": 2000,       # local model, quality falls off on long text
     "kittentts": 2000,    # local 25MB model
     "piper": 5000,        # local VITS model, phoneme-based; practical cap
-    # FAL: per-endpoint caps live in tools/voice_fal_catalog.py; this is the floor used when
-    # the resolved endpoint declares none (MiniMax speech-02-hd, the default, documents 5000).
-    "fal": 5000,
+    "fal": 5000,          # floor; the catalog entry is model-aware (see _resolve_max_text_length)
 }
 
 # ElevenLabs caps vary by model_id. https://elevenlabs.io/docs/overview/models
@@ -92,9 +90,7 @@ def _resolve_max_text_length(provider: Optional[str], tts_config: Optional[Dict[
         mapped = ELEVENLABS_MODEL_MAX_TEXT_LENGTH.get(str(model_id).strip())
         if mapped:
             return mapped
-    if key == "fal":
-        # Same model-aware shape as ElevenLabs above: FAL fronts many endpoints whose caps differ
-        # by an order of magnitude (Gemini 32k vs Kokoro 5k), so the catalog entry decides.
+    if key == "fal":  # model-aware like ElevenLabs: FAL endpoints range from 5k (Kokoro) to 32k (Gemini)
         from tools.voice_fal_catalog import resolve_tts_model
         mapped = _positive_int(resolve_tts_model(prov_cfg)[1].get("max_text_length"))
         if mapped:

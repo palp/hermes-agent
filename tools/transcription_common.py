@@ -8,6 +8,7 @@ import subprocess
 from typing import Any, Dict
 
 from tools.tts_command_provider import _get_provider_section as _get_stt_section
+from tools.voice_fal_catalog import DEFAULT_FAL_STT_MODEL  # noqa: F401  (re-exported with the other defaults)
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("tools.transcription_tools")
@@ -19,9 +20,6 @@ DEFAULT_STT_MODEL = os.getenv("STT_OPENAI_MODEL", "whisper-1")
 DEFAULT_GROQ_STT_MODEL = os.getenv("STT_GROQ_MODEL", "whisper-large-v3-turbo")
 DEFAULT_MISTRAL_STT_MODEL = os.getenv("STT_MISTRAL_MODEL", "voxtral-mini-latest")
 DEFAULT_ELEVENLABS_STT_MODEL = os.getenv("STT_ELEVENLABS_MODEL", "scribe_v2")
-# FAL fronts several ASR endpoints; the per-endpoint payload shapes live in
-# tools/voice_fal_catalog.py. wizper matches whisper-v3-large WER at ~2x the speed.
-DEFAULT_FAL_STT_MODEL = os.getenv("STT_FAL_MODEL", "fal-ai/wizper")
 LOCAL_STT_COMMAND_ENV = "HERMES_LOCAL_STT_COMMAND"
 LOCAL_STT_LANGUAGE_ENV = "HERMES_LOCAL_STT_LANGUAGE"
 COMMON_LOCAL_BIN_DIRS = ("/opt/homebrew/bin", "/usr/local/bin")

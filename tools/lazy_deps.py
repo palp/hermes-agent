@@ -102,10 +102,8 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     ),
 
     # ─── FAL.ai (image gen, video gen, TTS, STT) ───────────────────────────
-    # One key, one loader: every consumer goes through
-    # ``tools.fal_common.import_fal_client()``. Capability-scoped siblings
-    # (``tts.fal``/``stt.fal``) would duplicate this pin three ways — exactly the
-    # drift ``test_every_lazy_deps_exact_pin_matches_uv_lock`` polices.
+    # One key for every consumer (all go through ``fal_common.import_fal_client()``)
+    # rather than per-capability siblings that would duplicate the pin.
     "fal": ("fal-client==0.13.1",),
 
     # ─── Memory providers ──────────────────────────────────────────────────

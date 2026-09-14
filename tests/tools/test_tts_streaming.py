@@ -1071,5 +1071,5 @@ def test_fal_non_streaming_endpoint_refuses_construction(monkeypatch):
 def test_fal_prompt_steered_stream_needs_a_prompt(monkeypatch):
     cfg = _fal_cfg(streaming_model="fal-ai/maya")
     monkeypatch.setattr(ts, "_resolve_key", lambda *a, **kw: "fal-key")
-    with pytest.raises(RuntimeError, match="voice description"):
+    with pytest.raises(ValueError, match="voice description"):
         ts._REGISTRY["fal"](cfg, cfg["fal"])

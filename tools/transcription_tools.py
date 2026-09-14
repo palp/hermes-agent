@@ -227,9 +227,8 @@ _CLOUD_PROVIDER_SPECS = {
     "deepinfra": (_has_deepinfra_key, _has_deepinfra_key,
                   "STT provider 'deepinfra' configured but DEEPINFRA_API_KEY not set (or openai package missing)",
                   "No local STT available, using DeepInfra Whisper API"),
-    # FAL is LAST for the same reason DeepInfra is: FAL_KEY is commonly already set for image/video
-    # generation, and letting it auto-select would silently move existing users' STT off the
-    # provider they were using. Explicit ``provider: fal`` is unaffected.
+    # LAST for the same reason DeepInfra is: FAL_KEY is commonly set for image/video gen, and
+    # auto-selecting on it would silently move existing users' STT.
     "fal": (_has_fal_key, _has_fal_key,
             "STT provider 'fal' configured but FAL_KEY not set",
             "No local STT available, using FAL speech-to-text")}

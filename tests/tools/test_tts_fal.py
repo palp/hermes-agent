@@ -84,9 +84,10 @@ class TestRequirements:
     def test_missing_key_makes_fal_unavailable(self, monkeypatch):
         from tools import tts_tool
 
-        monkeypatch.delenv("FAL_KEY", raising=False)
+        from tools import fal_voice
+
         monkeypatch.setattr(tts_tool, "_load_tts_config", lambda: {"provider": "fal", "fal": {}})
-        monkeypatch.setattr(tts_tool, "_resolve_provider_key", lambda *a, **kw: "")
+        monkeypatch.setattr(fal_voice, "resolve_fal_key", lambda: "")
         assert tts_tool.check_tts_requirements() is False
 
     def test_unselected_fal_credentials_do_not_expose_the_edge_tool(self, monkeypatch):
